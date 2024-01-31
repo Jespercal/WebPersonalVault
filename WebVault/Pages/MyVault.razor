@@ -1,0 +1,41 @@
+﻿@page "/my_vault"
+@using WebVault.Services
+@inject PersonalVaultService pvs
+
+<PageTitle>My Vault</PageTitle>
+
+<h1>My Vault</h1>
+
+<div class="dropdown">
+    <button type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" class="btn btn-primary dropdown-toggle">Upload..</button>
+    <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+        <li><a class="dropdown-item" href="#">Text</a></li>
+        <li><a style="cursor:pointer;" class="dropdown-item" onclick="document.getElementById('upload-file-input').click();">File</a></li>
+    </ul>
+</div>
+
+<input type="file" style="display:none;" id="upload-file-input" />
+<h3>Store items:</h3>
+<table class="table table-bordered">
+    <tbody>
+        @if(pvs?.Objects?.Count > 0)
+        {
+            @foreach(var obj in pvs.Objects)
+            {
+                <label>
+                    @obj.Name
+                </label>
+            }
+        }
+        else
+        {
+            <tr>
+                <td>No items stored</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+
+}
