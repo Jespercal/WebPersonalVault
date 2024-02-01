@@ -200,14 +200,11 @@
             return;
 
         await JS.InvokeVoidAsync("lockModal", true);
-        EncryptedFileInfo? info;
-        if(uploadType == 1)
+        EncryptedFileInfo? info = null;
+        if (uploadType == 1)
             uploadedFileBytes = Encoding.ASCII.GetBytes(uploadedText);
         else
-            info = new EncryptedFileInfo()
-            {
-                Filename = 
-            }
+            info = uploadedFileInfo;
 
         string result = await ES.Encrypt(new Models.EncryptionSettings()
         {
@@ -215,6 +212,7 @@
             key = useOwnKey ? ownProvidedKey : null,
             user_id = HCA.HttpContext.User.FindFirst(u => u.Type.Contains("nameidentifier"))?.Value,
             type = (EncryptionType)encryptionType,
+            dataInfo = info,
             name = useName
         });
 

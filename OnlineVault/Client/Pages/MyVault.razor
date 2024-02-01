@@ -1,0 +1,439 @@
+﻿@page "/my_vault"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.JSInterop
+@using OnlineVault.Client.Services
+@using OnlineVault.Shared
+@attribute [Authorize]
+@inject HttpClient Http
+
+@using System.Text
+@using System.Collections.ObjectModel
+@using OnlineVault.Shared
+@using OnlineVault.Shared.Utils
+@using System.Net.Http.Json
+@inject IJSRuntime JS
+@inject EncryptingService ES
+
+<PageTitle>My Vault</PageTitle>
+
+<h1>My Vault</h1>
+
+<div class="modal fade" id="uploadFileModal" tabindex="-1" aria-labelledby="uploadFileModalLabel" aria-hidden="true">
+    <div class="modal-dialog @(uploadType == 1 ? "modal-lg" : "")">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadFileModalLabel">Upload @(uploadType == 1 ? "Text" : "File")</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if(uploadType == 1)
+                {
+                    <label class="form-label">Text to encrypt:</label>
+                    <InputTextArea class="form-control" style="width:98%;margin-left:auto;" @bind-Value="uploadedText"></InputTextArea>
+                }
+                else
+                {
+                    <label class="form-label">File to encrypt:</label>
+                    <InputFile OnChange="@LoadFiles" style="width:98%;margin-left:auto;" class="form-control" type="file" id="upload-file-input" />
+                }
+                <label class="form-label mt-3">Name in vault:</label>
+                <InputText class="form-control" style="width:98%;margin-left:auto;" @bind-Value="useName"></InputText>
+                
+                <label class="form-label mt-3">Encryption Type:</label>
+                <InputSelect style="width:98%;margin-left:auto;" class="form-select" @bind-Value="encryptionType">
+                    <option value="1">Hashed (Encrypt only)</option>
+                    <option value="2">Symmetric</option>
+                    @*<option value="3">Asymmetric</option>*@
+                </InputSelect>
+                @if(encryptionType < 3)
+                {
+                    <div class="form-check mt-3">
+                        <InputCheckbox id="useOwnKey" class="form-check-input" @bind-Value="useOwnKey"></InputCheckbox>
+                        <label style="user-select:none;" class="form-check-label" for="useOwnKey">
+                            Provide own @(encryptionType == 1 ? "salt" : (encryptionType == 2 ? "key" : "keys"))?
+                        </label>
+                    </div>
+                    @if(useOwnKey)
+                    {
+                        <div id="useownkeyprovidepanel" style="width:98%;margin-left:auto;" class="border @(IsValidProvidedKey() ? "border-success" : "border-danger")">
+                            <label class="form-label mt-3">Own provided @(encryptionType == 1 ? "salt" : "key"):</label>
+                            <InputText oninput="() => window.updateOwnKeyDiv()" style="width:98%;margin-left:auto;" class="form-control" @bind-Value="ownProvidedKey"></InputText>
+                        </div>
+                    }
+                }
+                @if(encryptionType > 1)
+                {
+                    <div class="form-check mt-3">
+                        <InputCheckbox id="ShouldStoreKey" class="form-check-input" @bind-Value="ShouldStoreKey"></InputCheckbox>
+                        <label style="user-select:none;" class="form-check-label" for="ShouldStoreKey">
+                            Store key in vault? (If no, you will have to save the key. If lost, your file is forever encrypted...)
+                        </label>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button onclick="@(() => ConfirmUpload())" type="button" class="btn btn-primary">Upload @(uploadType == 1 ? "Text" : "File")</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadFileModalLabel">Previewing Encrypted</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @previewEncrypted
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="display:flex;flex-direction:row;justify-content: space-between;">
+    <span style="font-size:x-large;">Store items:</span>
+    <div class="dropdown">
+        <button type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" class="btn btn-primary btn-sm dropdown-toggle">Upload..</button>
+        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+            <li><button onclick="@(() => openModal(1))" data-bs-toggle="modal" data-bs-target="#uploadFileModal" class="dropdown-item" href="#">Text</button></li>
+            <li><button onclick="@(() => openModal(2))" data-bs-toggle="modal" data-bs-target="#uploadFileModal" class="dropdown-item" href="#">File</button></li>
+        </ul>
+    </div>
+</div>
+<table class="table table-sm">
+    <thead>
+        <tr style="text-align:center;">
+            <th>Name</th>
+            <th>Type</th>
+            <th>Encryption Type</th>
+            <th>Uploaded</th>
+            <th colspan="2">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Objects.Count > 0)
+        {
+            @foreach (var obj in Objects)
+            {
+                <tr style="text-align:center;">
+                    <td style="text-align:start;width:35%;">
+                        @obj.Name
+                    </td>
+                    <td>
+                        <span>@(obj.IsFile ? "File" : "Text")</span>
+                    </td>
+                    <td>
+                        @(obj.EncryptionType == 1 ? "Hash" : (obj.EncryptionType == 2 ? "Symmetric" : "Asymmetric"))
+                    </td>
+                    <td>
+                        @obj.createdAt
+                    </td>
+                    <td style="width:70px;">
+                        @if(obj.EncryptionType != (int)EncryptionType.Hash)
+                        {
+                            <button class="form-control btn-outline-none w-100" onclick="@(() => ToggleDecryption(obj))">
+                                <span class="fa-solid @(obj.IsDataDecrypted ? "fa-lock-open" : "fa-lock") @(obj.IsDataDecrypted ? "text-success" : (string.IsNullOrEmpty(obj.Key1) ? "text-danger" : "text-secondary"))"></span>
+                            </button>
+                        }
+                    </td>
+                    <td style="width:100px;">
+@*                         @if(obj.EncryptionType == (int)EncryptionType.Hash)
+                        {
+                            <button class="btn btn-primary w-100">Compare</button>
+                        }
+                        else
+                        { *@
+                            @if(!obj.IsFile)
+                            {
+                                <button onclick="@(() => PreviewEncyption(obj))" class="btn btn-primary w-100">View</button>
+                            }
+                            else
+                            {
+                                <button onclick="@(() => DownloadEncryption(obj))" class="btn btn-primary w-100">Download</button>
+                            }
+                        @*}*@
+                    </td>
+                </tr>
+            }
+        }
+        else
+        {
+            <tr>
+                <td>No items stored</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private IBrowserFile uploadedFile;
+    private string uploadedText;
+    private string useName;
+    private int encryptionType = 2;
+    private int uploadType = 1;
+    private bool useOwnKey = false;
+    private string ownProvidedKey;
+    private Byte[] uploadedFileBytes;
+    private string uploadedFileName;
+    private bool ShouldStoreKey = true;
+    private bool IsValidProvidedKeyVal;
+
+    private string previewEncrypted;
+
+    private void OwnProvidedKeyChanged()
+    {
+        IsValidProvidedKey();
+        StateHasChanged();
+    }
+
+    private void ResetModal()
+    {
+        uploadedFile = null;
+        uploadedText = "";
+        useName = "";
+        encryptionType = 2;
+        uploadType = 1;
+        useOwnKey = false;
+        ownProvidedKey = null;
+        uploadedFileBytes = null;
+        ShouldStoreKey = true;
+    }
+
+    private bool IsValidProvidedKey()
+    {
+        if (!useOwnKey)
+            return true;
+
+        try
+        {
+            byte[] bytes = Convert.FromBase64String(ownProvidedKey);
+            if (bytes.Length != 16 && bytes.Length != 32)
+                return false;
+        }
+        catch(Exception ex)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected async override Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        try
+        {
+            Objects = (await Http.GetFromJsonAsync<List<DTOEncryptedObject>>("Vault"))
+                .Select(e => new ClientEncryptedObject(e))
+                .ToList();
+        }
+        catch (AccessTokenNotAvailableException exception)
+        {
+            exception.Redirect();
+        }
+    }
+
+    private List<ClientEncryptedObject> Objects = new List<ClientEncryptedObject>();
+
+    private bool fileIsUploading;
+
+    private async void LoadFiles(InputFileChangeEventArgs e)
+    {
+        fileIsUploading = true;
+        await JS.InvokeVoidAsync("lockModal", true);
+
+        using (var ms = new MemoryStream())
+        {
+            await e.File.OpenReadStream(9999999999).CopyToAsync(ms);
+            uploadedFileBytes = ms.ToArray();
+        }
+        uploadedFileName = e.File.Name;
+        await JS.InvokeVoidAsync("lockModal", false);
+        fileIsUploading = false;
+    }
+
+    private void openModal( int type )
+    {
+        uploadType = type;
+    }
+
+    private async void ConfirmUpload()
+    {
+        if (fileIsUploading)
+            return;
+
+        if (!IsValidProvidedKey())
+            return;
+
+        if (string.IsNullOrEmpty(useName) || (uploadType == 1 && string.IsNullOrEmpty(uploadedText)))
+            return;
+
+
+        await JS.InvokeVoidAsync("lockModal", true);
+        if (uploadType == 1)
+            uploadedFileBytes = Encoding.ASCII.GetBytes(uploadedText);
+
+        byte[] data = uploadedFileBytes;
+        string key1;
+        string key2;
+        if(encryptionType == 2)
+        {
+            key1 = useOwnKey ? ownProvidedKey : Convert.ToBase64String(CommonUtils.GenerateRandomByteArray(32));
+            key2 = Convert.ToBase64String(CommonUtils.GenerateRandomByteArray(16));
+            data = await AESEncrypt(key1, key2, data);
+        }
+        else
+        {
+            key1 = useOwnKey ? ownProvidedKey : null;
+            key2 = null;
+        }
+
+        DTOEncryptionResult result = await ES.Encrypt(new EncryptionSettings()
+        {
+            data = data,
+            key = ShouldStoreKey ? key1 : null,
+            key2 = key2,
+            type = (EncryptionType)encryptionType,
+            filename = (uploadType == 2 ? uploadedFileName : ""),
+            name = useName
+        });
+
+        if (result.Failed)
+        {
+            await JS.InvokeVoidAsync("showErrorMessage", result.Message);
+            await JS.InvokeVoidAsync("lockModal", false);
+            return;
+        }
+
+        try
+        {
+            HttpResponseMessage msg = await Http.PostAsJsonAsync<DTOEncryptedObject>("Vault", result.Data);
+            msg.EnsureSuccessStatusCode();
+        }
+        catch (AccessTokenNotAvailableException exception)
+        {
+            exception.Redirect();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("showErrorMessage", ex.Message);
+            await JS.InvokeVoidAsync("lockModal", false);
+            return;
+        }
+
+        if(!ShouldStoreKey)
+        {
+            await JS.InvokeVoidAsync("prompt", "Copy to clipboard: Ctrl+C, Enter", key1);
+        }
+
+        try
+        {
+            Objects = (await Http.GetFromJsonAsync<List<DTOEncryptedObject>>("Vault"))
+                .Select(e => new ClientEncryptedObject(e))
+                .ToList();
+        }
+        catch (AccessTokenNotAvailableException exception)
+        {
+            exception.Redirect();
+        }
+        catch(Exception ex)
+        {
+            await JS.InvokeVoidAsync("showErrorMessage", ex.Message);
+            await JS.InvokeVoidAsync("lockModal", false);
+            return;
+        }
+
+        ResetModal();
+        StateHasChanged();
+        await JS.InvokeVoidAsync("lockModal", false);
+        await JS.InvokeVoidAsync("toggleModal");
+    }
+
+    public async Task<byte[]> UseStreamDotReadMethod(Stream stream)
+    {
+        byte[] bytes;
+        List<byte> totalStream = new();
+        byte[] buffer = new byte[32];
+        int read;
+        while ((read = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        {
+            totalStream.AddRange(buffer.Take(read));
+        }
+        bytes = totalStream.ToArray();
+        return bytes;
+    }
+
+    private async void PreviewEncyption(ClientEncryptedObject obj)
+    {
+        string str = obj.EncryptionType == 1 ? Convert.ToBase64String(obj.Data) : Encoding.UTF8.GetString(obj.IsDataDecrypted ? obj.DataDecrypted : obj.Data);
+        previewEncrypted = str.Length > 500 ? (str.Substring(0,500) + "...") : str;
+        StateHasChanged();
+        await JS.InvokeVoidAsync("togglePreviewModel");
+    }
+
+    private async void DownloadEncryption(ClientEncryptedObject obj)
+    {
+        MemoryStream stream = new MemoryStream(obj.IsDataDecrypted ? obj.DataDecrypted : obj.Data);
+        using var streamRef = new DotNetStreamReference(stream: stream);
+        await JS.InvokeVoidAsync("downloadFileFromStream", obj.Type, streamRef);
+    }
+
+    // o0qDsEm+okJyyroOFgfaOEFVXjXMQmDJdjp91rb1bkA=
+    private async void ToggleDecryption( ClientEncryptedObject obj )
+    {
+        if(!obj.IsDataDecrypted && obj.DataDecrypted == null)
+        {
+            if(obj.Key1 == null || obj.Key1 == "")
+            {
+                obj.Key1 = await JS.InvokeAsync<string>("prompt", "Enter Base64 Key");
+                obj.DataDecrypted = await JS.InvokeAsync<byte[]?>("AESDecrypt", obj.Key1, obj.Key2, obj.Data);
+                if (obj.DataDecrypted == null)
+                {
+
+                    obj.IsDataDecrypted = false;
+                    obj.Key1 = null;
+                    await JS.InvokeVoidAsync("alert", "Incorrect key...");
+                    StateHasChanged();
+                    return;
+                }
+
+            }
+            obj.DataDecrypted = await JS.InvokeAsync<byte[]?>("AESDecrypt", obj.Key1, obj.Key2, obj.Data);
+            obj.IsDataDecrypted = !obj.IsDataDecrypted;
+        }
+        else
+        {
+            obj.IsDataDecrypted = !obj.IsDataDecrypted;
+        }
+        StateHasChanged();
+    }
+
+    private string GenRandomKey()
+    {
+        // Generate a random 256-bit key.
+        byte[] randomBytes = new byte[32];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(randomBytes);
+        return Convert.ToBase64String(randomBytes);
+    }
+
+    private async Task<byte[]?> AESEncrypt( string key, string iv, byte[] rawData )
+    {
+        try
+        {
+            byte[] digestAsBytes = await JS.InvokeAsync<byte[]>("AESEncrypt", key, iv, rawData);
+            if (digestAsBytes == new byte[0])
+                throw new Exception("Failed to encrypt");
+            return digestAsBytes;
+        }
+        catch (Exception ex)
+        {
+        }
+
+        return null;
+    }
+}
