@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using WebVault.Data;
 using WebVault.Models;
@@ -24,7 +25,14 @@ namespace WebVault.Services
         public string PersonalKey { get; set; }
         public List<EncryptedObject> Objects { get; set; }
 
-        private void Load()
+        public async Task LoadAsync()
+        {
+            Objects = await _dbContext.EncryptedObjects
+                .AsQueryable()
+                .Where(e => e.UserId == UserId)
+                .ToListAsync();
+        }
+        public void Load()
         {
             Objects = _dbContext.EncryptedObjects
                 .AsQueryable()

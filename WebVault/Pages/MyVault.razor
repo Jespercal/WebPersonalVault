@@ -1,30 +1,121 @@
 ﻿@page "/my_vault"
+@using System.Text
+@using System.Collections.ObjectModel
+@using WebVault.Models
 @using WebVault.Services
+@using WebVault.Utils
 @inject PersonalVaultService pvs
+@inject IJSRuntime JS
+@inject EncryptingService ES
+@inject IHttpContextAccessor HCA
 
 <PageTitle>My Vault</PageTitle>
 
 <h1>My Vault</h1>
 
-<div class="dropdown">
-    <button type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" class="btn btn-primary dropdown-toggle">Upload..</button>
-    <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-        <li><a class="dropdown-item" href="#">Text</a></li>
-        <li><a style="cursor:pointer;" class="dropdown-item" onclick="document.getElementById('upload-file-input').click();">File</a></li>
-    </ul>
+<div class="modal fade" id="uploadFileModal" tabindex="-1" aria-labelledby="uploadFileModalLabel" aria-hidden="true">
+    <div class="modal-dialog @(uploadType == 1 ? "modal-lg" : "")">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadFileModalLabel">Upload @(uploadType == 1 ? "Text" : "File")</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if(uploadType == 1)
+                {
+                    <label class="form-label">Text to encrypt:</label>
+                    <InputTextArea class="form-control" style="width:98%;margin-left:auto;" @bind-Value="uploadedText"></InputTextArea>
+                }
+                else
+                {
+                    <label class="form-label">File to encrypt:</label>
+                    <InputFile OnChange="@LoadFiles" style="width:98%;margin-left:auto;" class="form-control" type="file" id="upload-file-input" />
+                }
+                <label class="form-label mt-3">Name in vault:</label>
+                <InputText class="form-control" style="width:98%;margin-left:auto;" @bind-Value="useName"></InputText>
+                
+                <label class="form-label mt-3">Encryption Type:</label>
+                <InputSelect style="width:98%;margin-left:auto;" class="form-select" @bind-Value="encryptionType">
+                    <option value="1">Hashed (Encrypt only)</option>
+                    <option value="2">Symmetric</option>
+                    <option value="3">Asymmetric</option>
+                </InputSelect>
+                @if(encryptionType < 3)
+                {
+                    <div class="form-check mt-3">
+                        <InputCheckbox id="useOwnKey" class="form-check-input" @bind-Value="useOwnKey"></InputCheckbox>
+                        <label style="user-select:none;" class="form-check-label" for="useOwnKey">
+                            Provide own @(encryptionType == 1 ? "salt" : (encryptionType == 2 ? "key" : "keys"))?
+                        </label>
+                    </div>
+                    @if(useOwnKey)
+                    {
+                        <div style="width:98%;margin-left:auto;">
+                            <label class="form-label mt-3">Own provided @(encryptionType == 1 ? "salt" : "key"):</label>
+                            <InputText style="width:98%;margin-left:auto;" class="form-control" @bind-Value="ownProvidedKey"></InputText>
+                        </div>
+                    }
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button onclick="@(() => ConfirmUpload())" type="button" class="btn btn-primary">Upload @(uploadType == 1 ? "Text" : "File")</button>
+            </div>
+        </div>
+    </div>
 </div>
 
-<input type="file" style="display:none;" id="upload-file-input" />
-<h3>Store items:</h3>
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadFileModalLabel">Previewing Encrypted</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @previewEncrypted
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="display:flex;flex-direction:row;justify-content: space-between;">
+    <span style="font-size:x-large;">Store items:</span>
+    <div class="dropdown">
+        <button type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false" class="btn btn-primary btn-sm dropdown-toggle">Upload..</button>
+        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+            <li><button onclick="@(() => openModal(1))" data-bs-toggle="modal" data-bs-target="#uploadFileModal" class="dropdown-item" href="#">Text</button></li>
+            <li><button onclick="@(() => openModal(2))" data-bs-toggle="modal" data-bs-target="#uploadFileModal" class="dropdown-item" href="#">File</button></li>
+        </ul>
+    </div>
+</div>
 <table class="table table-bordered">
     <tbody>
-        @if(pvs?.Objects?.Count > 0)
+        @if (Objects.Count > 0)
         {
-            @foreach(var obj in pvs.Objects)
+            @foreach (var obj in Objects)
             {
-                <label>
-                    @obj.Name
-                </label>
+                <tr>
+                    <td>
+                        @obj.Name
+                    </td>
+                    <td>
+                        @(obj.EncryptionType == 1 ? "Hashed" : (obj.EncryptionType == 2 ? "Symmetric" : "Asymmetric"))
+                    </td>
+                    <td>
+                        @obj.createdAt
+                    </td>
+                    <td>
+                        @if(obj.Type == "")
+                        {
+                            <button onclick="@(() => PreviewEncyption(obj))" class="btn btn-primary">View</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-primary">Download</button>
+                        }
+                    </td>
+                </tr>
             }
         }
         else
@@ -36,6 +127,131 @@
     </tbody>
 </table>
 
-@code {
+<script>
+    document.lockModal = function(truefalse)
+    { 
+        $("#parent-selector :input").attr("disabled", truefalse);
+    }
+</script>
 
+@code {
+    private IBrowserFile uploadedFile;
+    private string uploadedText;
+    private string useName;
+    private int encryptionType = 2;
+    private int uploadType = 1;
+    private bool useOwnKey = false;
+    private string ownProvidedKey;
+    private Byte[] uploadedFileBytes;
+    private EncryptedFileInfo uploadedFileInfo;
+
+    private string previewEncrypted;
+
+    private void ResetModal()
+    {
+        uploadedFile = null;
+        uploadedText = "";
+        useName = "";
+        encryptionType = 2;
+        uploadType = 1;
+        useOwnKey = false;
+        ownProvidedKey = null;
+        uploadedFileBytes = null;
+    }
+
+    protected async override Task OnInitializedAsync()
+    {
+        Objects = new ObservableCollection<EncryptedObject>(pvs.Objects);
+        await base.OnInitializedAsync();
+    }
+
+    private ObservableCollection<EncryptedObject> Objects = new ObservableCollection<EncryptedObject>();
+
+    private bool fileIsUploading;
+
+    private async void LoadFiles(InputFileChangeEventArgs e)
+    {
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "unsafe_uploads");
+        if (!Directory.Exists(path))
+            Directory.CreateDirectory(path);
+
+        //await using FileStream fs = new(Path.Combine(path, "test.txt"), FileMode.Create);
+        //await e.File.OpenReadStream(9999999999).CopyToAsync(fs);
+        fileIsUploading = true;
+        await JS.InvokeVoidAsync("lockModal", true);
+        uploadedFileBytes = await UseStreamDotReadMethod(e.File.OpenReadStream(9999999999));
+        uploadedFileInfo = new EncryptedFileInfo()
+        {
+            Filename = e.File.Name.Split('.').First(),
+            Extension = e.File.Name.Split('.').Last()
+        };
+        await JS.InvokeVoidAsync("lockModal", false);
+        fileIsUploading = false;
+    }
+
+    private void openModal( int type )
+    {
+        uploadType = type;
+    }
+
+    private async void ConfirmUpload()
+    {
+        if (fileIsUploading)
+            return;
+
+        await JS.InvokeVoidAsync("lockModal", true);
+        EncryptedFileInfo? info;
+        if(uploadType == 1)
+            uploadedFileBytes = Encoding.ASCII.GetBytes(uploadedText);
+        else
+            info = new EncryptedFileInfo()
+            {
+                Filename = 
+            }
+
+        string result = await ES.Encrypt(new Models.EncryptionSettings()
+        {
+            data = uploadedFileBytes,
+            key = useOwnKey ? ownProvidedKey : null,
+            user_id = HCA.HttpContext.User.FindFirst(u => u.Type.Contains("nameidentifier"))?.Value,
+            type = (EncryptionType)encryptionType,
+            name = useName
+        });
+
+        if(result != "")
+        {
+            await JS.InvokeVoidAsync("showErrorMessage", result);
+            await JS.InvokeVoidAsync("lockModal", false);
+            return;
+        }
+
+        await pvs.LoadAsync();
+        Objects = new ObservableCollection<EncryptedObject>(pvs.Objects);
+        ResetModal();
+        StateHasChanged();
+        await JS.InvokeVoidAsync("lockModal", false);
+        await JS.InvokeVoidAsync("toggleModal");
+    }
+
+    public async Task<byte[]> UseStreamDotReadMethod(Stream stream)
+    {
+        byte[] bytes;
+        List<byte> totalStream = new();
+        byte[] buffer = new byte[32];
+        int read;
+        while ((read = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        {
+            totalStream.AddRange(buffer.Take(read));
+        }
+        bytes = totalStream.ToArray();
+        return bytes;
+    }
+
+    private async void PreviewEncyption( EncryptedObject obj )
+    {
+        string str = await StorageHandler.ReadFileAsync(obj.Path);
+        previewEncrypted = str.Length > 500 ? (str.Substring(0,500) + "...") : str;
+        StateHasChanged();
+        await JS.InvokeVoidAsync("togglePreviewModel");
+    }
 }
