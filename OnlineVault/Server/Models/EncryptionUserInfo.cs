@@ -17,6 +17,7 @@ namespace OnlineVault.Server.Models
         public string? PrivateKey { get; set; }
         public string? PublicKey { get; set; }
         public string? UserPublicKey { get; set; }
+        public string? ServiceXML { get; set; }
 
         public string SessionToken { get; set; }
 
@@ -24,10 +25,11 @@ namespace OnlineVault.Server.Models
 
         public void GenerateFirstKeys()
         {
-            using RSACryptoServiceProvider rsa = new(2048);
+            RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048);
+            PrivateKey = rsa.ExportRSAPrivateKeyPem();
+            PublicKey = rsa.ExportRSAPublicKeyPem();
+            ServiceXML = rsa.ToXmlString(true);
             rsa.PersistKeyInCsp = false;
-            PublicKey = rsa.ExportParameters(false);
-            PrivateKey = rsa.ExportParameters(true);
         }
     }
 }
