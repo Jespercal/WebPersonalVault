@@ -148,7 +148,7 @@
                         }
                         else
                         { *@
-                            @if(!obj.IsFile)
+                            @if(!obj.IsFile || obj.EncryptionType == (int)EncryptionType.Hash)
                             {
                                 <button onclick="@(() => PreviewEncyption(obj))" class="btn btn-primary w-100">View</button>
                             }
@@ -164,7 +164,7 @@
         else
         {
             <tr>
-                <td>No items stored</td>
+                <td colspan="5"><b><i>No items stored</i></b></td>
             </tr>
         }
     </tbody>
@@ -276,7 +276,7 @@
 
         await JS.InvokeVoidAsync("lockModal", true);
         if (uploadType == 1)
-            uploadedFileBytes = Encoding.ASCII.GetBytes(uploadedText);
+            uploadedFileBytes = Encoding.UTF8.GetBytes(uploadedText);
 
         byte[] data = uploadedFileBytes;
         string key1;

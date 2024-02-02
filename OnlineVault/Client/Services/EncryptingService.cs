@@ -21,11 +21,9 @@ namespace OnlineVault.Client.Services
 
         private async Task<DTOEncryptionResult> EncryptHash( EncryptionSettings settings )
         {
-            byte[] salt;
+            byte[] salt = null;
             if (settings.key != null)
                 salt = Encoding.ASCII.GetBytes(settings.key);
-            else
-                salt = CommonUtils.GenerateRandomByteArray();
 
             byte[] encryptedData = HashEncryption.Encrypt(settings.data, salt);
 
@@ -33,7 +31,7 @@ namespace OnlineVault.Client.Services
             {
                 Data = encryptedData,
                 Name = !string.IsNullOrEmpty(settings.name) ? settings.name : "Unknown",
-                Key1 = Encoding.ASCII.GetString(salt),
+                Key1 = salt != null ? Convert.ToBase64String(salt) : null,
                 EncryptionType = (int)EncryptionType.Hash,
                 Type = (!string.IsNullOrEmpty(settings.filename) ? settings.filename : ""),
                 IsFile = !string.IsNullOrEmpty(settings.filename)
