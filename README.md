@@ -27,22 +27,22 @@ After the MSSQL is setup, you are ready to launch the server and client!
 
 ## Packages
 ### Client
-|Package Name|Version|
-|----------------------|
+| Package Name | Version |
+| ------------ | ---------- |
 |Microsoft.AspNetCore.Components.WebAssembly|7.0.14|
 |Microsoft.AspNetCore.Components.WebAssembly.Authentication|7.0.14|
 |Microsoft.AspNetCore.Components.WebAssembly.DevServer|7.0.14|
 |Microsoft.Extensions.Http|7.0.0|
 ### Server
-|Package Name|Version|
-|----------------------|
-|Microsoft.AspNetCore.ApiAuthorization.IdentityServer|7.0.14|
-|Microsoft.AspNetCore.Components.WebAssembly.Server|7.0.14|
-|Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore|7.0.14|
-|Microsoft.AspNetCore.Identity.EntityFrameworkCore|7.0.14|
-|Microsoft.AspNetCore.Identity.UI|7.0.14|
-|Microsoft.EntityFrameworkCore.SqlServer|7.0.14|
-|Microsoft.EntityFrameworkCore.Tools|7.0.14|
+| Package Name | Version |
+| ------------ | ---------- |
+| Microsoft.AspNetCore.ApiAuthorization.IdentityServer | 7.0.14 |
+| Microsoft.AspNetCore.Components.WebAssembly.Server | 7.0.14 |
+| Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore | 7.0.14 |
+| Microsoft.AspNetCore.Identity.EntityFrameworkCore | 7.0.14 |
+| Microsoft.AspNetCore.Identity.UI | 7.0.14 |
+| Microsoft.EntityFrameworkCore.SqlServer | 7.0.14 |
+| Microsoft.EntityFrameworkCore.Tools | 7.0.14 |
 
 ## Versions
 ### 1.0
