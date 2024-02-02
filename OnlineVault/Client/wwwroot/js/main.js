@@ -1,17 +1,19 @@
-﻿function lockModal(truefalse) {
+﻿
+
+lockModal = function (truefalse) {
     $("#uploadFileModal").find("select, input, button").attr("disabled", truefalse)
 }
 
-function toggleModal() {
+toggleModal = function () {
     var myModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('uploadFileModal'));
     myModal.toggle();
 }
 
-function showErrorMessage(msg) {
+showErrorMessage = function (msg) {
     alert(msg);
 }
 
-function togglePreviewModel() {
+togglePreviewModel = function () {
     var myModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('previewModal'));
     myModal.toggle();
 }
