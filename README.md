@@ -55,3 +55,8 @@ This allows us to encrypt the files before they are sent to the server.
 Although TLS would provide some security, sending the unecrypted files would still be unwise, since the server would the also have to encrypt them afterwards.
 > [!IMPORTANT]
 > Using WebAssembly to encrypt caused another issue. As of an earlier version of .NET, Crypto classes like Aes became unsupported, in favor of Mozilla's "Web Crypto API". It took some time to adjust the code to this, but it wasn't too difficult once the API documentation was looked through.
+
+## Future Ideas
+- [ ] UnitTest of clientside encryption. A bit more complicated, since it's done in Javascript.
+- [ ] UnitTest of serverside. The least important, since it's just saving files and giving them back, no encryption is happening.
+- [ ] Asymmetric handshake between Client and Server on start, for sharing encrypted keys and double-encrypted files during transfer.
