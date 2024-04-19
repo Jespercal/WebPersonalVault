@@ -31,6 +31,10 @@ namespace OnlineVault
                 .AddIdentityServerJwt();
 
             builder.Services.AddControllersWithViews();
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen(e => {
+
+            });
             builder.Services.AddRazorPages();
             builder.Services.AddHttpContextAccessor();
 
@@ -63,6 +67,9 @@ namespace OnlineVault
             app.MapRazorPages();
             app.MapControllers();
             app.MapFallbackToFile("index.html");
+
+            app.UseSwagger();
+            app.UseSwaggerUI();
 
             app.Run();
         }

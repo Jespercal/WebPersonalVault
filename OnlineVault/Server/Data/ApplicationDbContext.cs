@@ -9,6 +9,7 @@ namespace OnlineVault.Server.Data
     public class ApplicationDbContext : ApiAuthorizationDbContext<ApplicationUser>
     {
         public DbSet<EncryptedObject> EncryptedObjects { get; set; }
+        public DbSet<EncryptionUserInfo> EncryptedUserInfos { get; set; }
 
         public ApplicationDbContext(DbContextOptions options,IOptions<OperationalStoreOptions> operationalStoreOptions) : base(options, operationalStoreOptions)
         {
